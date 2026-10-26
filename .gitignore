@@ -1,0 +1,19 @@
+# Node / backend
+node_modules/
+backend/.env
+*.sqlite
+*.sqlite3
+
+# Flutter
+.env
+app_flutter/.env
+.dart_tool/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# IDE / sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
