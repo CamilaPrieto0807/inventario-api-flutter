@@ -1,3 +1,5 @@
+require('dotenv').config({ path: require('node:path').join(__dirname, '.env') });
+
 const express = require('express');
 const cors = require('cors');
 const { Op } = require('sequelize');
@@ -9,11 +11,14 @@ app.use(express.json());
 
 function validar(body) {
   const errores = {};
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return { body: 'El cuerpo debe ser un objeto JSON' };
+  }
   if (!body.nombre || !String(body.nombre).trim()) errores.nombre = 'El nombre es obligatorio';
   if (!body.codigo || !String(body.codigo).trim()) errores.codigo = 'El código es obligatorio';
   if (!body.categoria || !String(body.categoria).trim()) errores.categoria = 'La categoría es obligatoria';
   if (body.precio === undefined || body.precio === null || body.precio === '' ||
-      isNaN(body.precio) || Number(body.precio) < 0)
+      !Number.isFinite(Number(body.precio)) || Number(body.precio) < 0)
     errores.precio = 'El precio debe ser un número mayor o igual a 0';
   if (body.cantidad === undefined || body.cantidad === null || body.cantidad === '' ||
       !Number.isInteger(Number(body.cantidad)) || Number(body.cantidad) < 0)
@@ -35,24 +40,38 @@ function datosLimpios(b) {
 const error422 = (res, errors) =>
   res.status(422).json({ message: 'Datos inválidos', errors });
 
+function idValido(id) {
+  const parsed = Number(id);
+  return /^\d+$/.test(id) && Number.isSafeInteger(parsed) && parsed > 0;
+}
+
+function responderError(res, error) {
+  console.error(error);
+  if (error.name === 'SequelizeUniqueConstraintError') {
+    return error422(res, { codigo: 'El código ya existe' });
+  }
+  return res.status(500).json({ message: 'Error interno del servidor' });
+}
+
 // GET todos
 app.get('/api/productos', async (req, res) => {
   try {
     const productos = await Producto.findAll({ order: [['id', 'DESC']] });
     res.status(200).json(productos);
   } catch (e) {
-    res.status(500).json({ message: 'Error interno del servidor' });
+    responderError(res, e);
   }
 });
 
 // GET uno
 app.get('/api/productos/:id', async (req, res) => {
+  if (!idValido(req.params.id)) return res.status(422).json({ message: 'El id debe ser un entero positivo' });
   try {
     const p = await Producto.findByPk(req.params.id);
     if (!p) return res.status(404).json({ message: 'Producto no encontrado' });
     res.status(200).json(p);
   } catch (e) {
-    res.status(500).json({ message: 'Error interno del servidor' });
+    responderError(res, e);
   }
 });
 
@@ -69,12 +88,13 @@ app.post('/api/productos', async (req, res) => {
     const nuevo = await Producto.create(datos);
     res.status(201).json(nuevo);
   } catch (e) {
-    res.status(500).json({ message: 'Error interno del servidor' });
+    responderError(res, e);
   }
 });
 
 // PUT
 app.put('/api/productos/:id', async (req, res) => {
+  if (!idValido(req.params.id)) return res.status(422).json({ message: 'El id debe ser un entero positivo' });
   try {
     const p = await Producto.findByPk(req.params.id);
     if (!p) return res.status(404).json({ message: 'Producto no encontrado' });
@@ -91,26 +111,36 @@ app.put('/api/productos/:id', async (req, res) => {
     await p.update(datos);
     res.status(200).json(p);
   } catch (e) {
-    res.status(500).json({ message: 'Error interno del servidor' });
+    responderError(res, e);
   }
 });
 
 // DELETE
 app.delete('/api/productos/:id', async (req, res) => {
+  if (!idValido(req.params.id)) return res.status(422).json({ message: 'El id debe ser un entero positivo' });
   try {
     const p = await Producto.findByPk(req.params.id);
     if (!p) return res.status(404).json({ message: 'Producto no encontrado' });
     await p.destroy();
     res.status(200).json({ message: 'Producto eliminado correctamente' });
   } catch (e) {
-    res.status(500).json({ message: 'Error interno del servidor' });
+    responderError(res, e);
   }
+});
+
+app.use((req, res) => res.status(404).json({ message: 'Ruta no encontrada' }));
+
+app.use((error, req, res, next) => {
+  if (error instanceof SyntaxError && error.status === 400 && 'body' in error) {
+    return res.status(400).json({ message: 'El cuerpo de la solicitud no contiene JSON válido' });
+  }
+  responderError(res, error);
 });
 
 const PORT = process.env.PORT || 3000;
 
-sequelize.sync().then(async () => {
-  // Seed: 10 productos de prueba si la tabla está vacía
+async function iniciarServidor() {
+  await sequelize.sync();
   if ((await Producto.count()) === 0) {
     await Producto.bulkCreate([
       { nombre: 'Arroz 500g', codigo: 'P001', descripcion: 'Arroz blanco', precio: 2500, cantidad: 100, categoria: 'Granos' },
@@ -125,5 +155,17 @@ sequelize.sync().then(async () => {
       { nombre: 'Gaseosa 1.5L', codigo: 'P010', descripcion: 'Bebida gaseosa', precio: 6500, cantidad: 45, categoria: 'Bebidas' },
     ]);
   }
-  app.listen(PORT, '0.0.0.0', () => console.log(`API en http://localhost:${PORT}`));
-});
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`API en http://localhost:${server.address().port}`);
+  });
+  return server;
+}
+
+if (require.main === module) {
+  iniciarServidor().catch((error) => {
+    console.error('No fue posible iniciar la API:', error);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = { app, iniciarServidor };
