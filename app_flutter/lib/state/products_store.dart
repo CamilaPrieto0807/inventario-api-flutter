@@ -33,6 +33,14 @@ class ProductsStore extends ChangeNotifier {
     }
   }
 
+  // Limpia los datos en memoria (se usa al cerrar sesión)
+  void clear() {
+    products = [];
+    errorMessage = null;
+    isLoading = false;
+    notifyListeners();
+  }
+
   Future<Product> create(Product product) async {
     final saved = await api.createProduct(product);
     products = [saved, ...products];

@@ -9,7 +9,11 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selectedIndex = location.startsWith('/products') ? 1 : 0;
+    final selectedIndex = location.startsWith('/products')
+        ? 1
+        : location.startsWith('/session')
+        ? 2
+        : 0;
     return Scaffold(
       appBar: AppBar(
         title: const Row(
@@ -24,7 +28,7 @@ class AppShell extends StatelessWidget {
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedIndex,
         onDestinationSelected: (index) {
-          context.go(index == 0 ? '/dashboard' : '/products');
+          context.go(const ['/dashboard', '/products', '/session'][index]);
         },
         destinations: const [
           NavigationDestination(
@@ -36,6 +40,11 @@ class AppShell extends StatelessWidget {
             icon: Icon(Icons.inventory_2_outlined),
             selectedIcon: Icon(Icons.inventory_2),
             label: 'Productos',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Sesión',
           ),
         ],
       ),

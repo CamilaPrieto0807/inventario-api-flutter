@@ -12,19 +12,7 @@ class ApiException implements Exception {
 }
 
 class ProductApi {
-  ProductApi({required String baseUrl})
-    : _dio = Dio(
-        BaseOptions(
-          baseUrl: baseUrl.endsWith('/') ? baseUrl : '$baseUrl/',
-          connectTimeout: const Duration(seconds: 10),
-          receiveTimeout: const Duration(seconds: 10),
-          headers: const {'Content-Type': 'application/json'},
-        ),
-      ) {
-    if (baseUrl.trim().isEmpty) {
-      throw const ApiException('Configura API_BASE_URL en el archivo .env');
-    }
-  }
+  ProductApi(this._dio);
 
   final Dio _dio;
 
