@@ -102,6 +102,56 @@ flutter test
 backend/       API Express, modelo Sequelize, SQLite y pruebas de integración
 app_flutter/   Aplicación Flutter y configuración de la URL de API
 ```
+## Autenticación JWT
+
+La API usa JSON Web Tokens. Todos los endpoints de `/api/productos` exigen el encabezado `Authorization: Bearer <token>`; sin token válido, vencido o inválido responden `401`.
+
+### Configuración del backend
+
+Copia `backend/.env.example` como `backend/.env` y completa el secreto:
+
+```
+JWT_SECRET=<texto largo y aleatorio>
+JWT_EXPIRES_IN=1h
+```
+
+Para generar un secreto:
+
+```
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Al iniciar por primera vez se crea un usuario de prueba: `camila@demo.com` / `Demo1234`.
+
+### Endpoints de autenticación
+
+| Método | Ruta | Descripción |
+| ------ | ---- | ----------- |
+| POST | `/api/auth/login` | Valida credenciales y devuelve `access_token` y los datos del usuario (`200`). Credenciales incorrectas: `401`. |
+| GET | `/api/auth/me` | Devuelve el usuario del token (requiere `Bearer`). |
+
+### Cómo probar
+
+1. Petición sin token (debe responder `401`):
+   ```
+   curl -i http://localhost:3000/api/productos
+   ```
+2. Login:
+   ```
+   curl -X POST http://localhost:3000/api/auth/login -H "Content-Type: application/json" -d "{\"email\":\"camila@demo.com\",\"password\":\"Demo1234\"}"
+   ```
+3. Con el token obtenido:
+   ```
+   curl http://localhost:3000/api/productos -H "Authorization: Bearer <token>"
+   ```
+
+### Flutter
+
+- `services/api_client.dart`: Dio con interceptor que agrega el Bearer y detecta respuestas `401`.
+- `services/auth_storage.dart`: `flutter_secure_storage` guarda el token; `shared_preferences` guarda nombre y correo.
+- `state/auth_store.dart`: estado de sesión, login, cierre de sesión y validación al abrir la app.
+- `app.dart`: `redirect` de go_router; sin sesión solo se accede a `/login`.
+- `screens/login_screen.dart` y `screens/session_screen.dart`: inicio de sesión e información de la sesión.
 
 ## Despliegue y demostración
 
